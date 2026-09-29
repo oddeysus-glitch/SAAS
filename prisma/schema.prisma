@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum AppType {
+  Headshots
+  Blogger
+  Wiki
+  Influencer
+  Creator
+}
+
+enum JobStatus {
+  Pending
+  Processing
+  Completed
+  Failed
+}
+
+enum CreditType {
+  Headshots
+  BlogPosts
+  WikiPages
+  InfluencerPacks
+  CreatorPacks
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  creditLedgers CreditLedger[]
+  jobs          Job[]
+  previewCounts PreviewCount[]
+  events        Event[]
+  billing       BillingRequest[]
+  payouts       PayoutRequest[]
+}
+
+model Result {
+  id        String   @id @default(uuid())
+  jobId     String   @unique
+  output    String   @db.Text
+  url       String?
+  type      String?
+  createdAt DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Plan {
+  id          String   @id @default(uuid())
+  name        String
+  app        AppType
+  priceId     String   @unique
+  amount      Int      // cents
+  credits     Int      // credits granted on purchase
+  metadata    String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CreditLedger {
+  id                     String   @id @default(uuid())
+  userId                 String
+  type                   CreditType
+  amount                 Int
+  balance                Int
+  reason                 String?
+  stripeSessionId        String?
+  stripePaymentIntentId  String?
+  createdAt              DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Job {
+  id           String     @id @default(uuid())
+  userId       String
+  app         AppType
+  status       JobStatus  @default(Pending)
+  input        String     @db.Text
+  metadata     String?    @db.Text
+  errorMessage String?    @db.Text
+  creditsUsed  Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  result Result?
+}
+
+model PreviewCount {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  headshots Int      @default(0)
+  blogs     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  properties String? @db.Text
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BillingRequest {
+  id        String   @id @default(uuid())
+  userId    String
+  properties String  @db.Text
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PayoutRequest {
+  id        String   @id @default(uuid())
+  userId    String
+  app       String
+  amount    Int
+  status    String   @default("pending")
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
